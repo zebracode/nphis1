@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ========== Farmer Portal ==========
+model Farm {
+  id          Int      @id @default(autoincrement())
+  name        String   @db.VarChar(255)
+  description String?  @db.Text
+  location    String?  @db.VarChar(500)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  animals     Animal[]
+  appointments Appointment[]
+}
+
+model Animal {
+  id          Int      @id @default(autoincrement())
+  farmId      Int
+  farm        Farm     @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  species     String   @db.VarChar(100)
+  tagNumber   String?  @db.VarChar(100)
+  name        String?  @db.VarChar(255)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  dailyRecords   DailyRecord[]
+  appointments   Appointment[]
+}
+
+model DailyRecord {
+  id          Int      @id @default(autoincrement())
+  animalId    Int
+  animal      Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  recordDate  DateTime @db.Date
+  feedAmount  String?  @db.VarChar(100)
+  symptoms    String?  @db.Text
+  weightKg    Decimal? @db.Decimal(10, 2)
+  milkAmount  String?  @db.VarChar(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+enum AppointmentType {
+  NORMAL
+  URGENT
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+}
+
+model Appointment {
+  id              Int               @id @default(autoincrement())
+  farmId          Int
+  farm            Farm              @relation(fields: [farmId], references: [id], onDelete: Cascade)
+  animalId        Int?
+  animal          Animal?           @relation(fields: [animalId], references: [id], onDelete: SetNull)
+  type            AppointmentType    @default(NORMAL)
+  status          AppointmentStatus @default(PENDING)
+  appointmentDate DateTime          @db.Date
+  note            String?           @db.Text
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  examination     Examination?
+}
+
+// ========== Examination ==========
+enum ClinicType {
+  LIVESTOCK
+  HORSE
+  OTHER
+}
+
+enum ExaminationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+}
+
+model Examination {
+  id             Int       @id @default(autoincrement())
+  appointmentId  Int?      @unique
+  appointment    Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+  animalId       Int?
+  farmId         Int?
+  clinicType     ClinicType @default(LIVESTOCK)
+  summary        String?   @db.Text
+  examDate       DateTime  @default(now())
+  status         ExaminationStatus @default(DRAFT)
+  isFarmVisit    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  images         ExaminationImage[]
+  teachingCase   TeachingCase?
+}
+
+model ExaminationImage {
+  id            Int        @id @default(autoincrement())
+  examinationId Int
+  examination   Examination @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  filePath     String     @db.VarChar(500)
+  sortOrder    Int        @default(0)
+  createdAt    DateTime   @default(now())
+}
+
+// ========== Teaching ==========
+enum UserRole {
+  FARMER
+  VET
+  STUDENT
+  INSTRUCTOR
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  email     String   @unique @db.VarChar(255)
+  role      UserRole @default(FARMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  teachingCasesAsStudent TeachingCase[] @relation("StudentCases")
+}
+
+enum TeachingCaseStatus {
+  PENDING_APPROVAL
+  APPROVED
+}
+
+model TeachingCase {
+  id                   Int                @id @default(autoincrement())
+  examinationId        Int                @unique
+  examination          Examination        @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+  studentId            Int
+  student              User               @relation("StudentCases", fields: [studentId], references: [id], onDelete: Cascade)
+  status               TeachingCaseStatus @default(PENDING_APPROVAL)
+  studentNote          String?            @db.Text
+  actualCost           Decimal?           @db.Decimal(12, 2)
+  costWaivedForTeaching Boolean           @default(false)
+  costNote             String?            @db.VarChar(500)
+  approvedAt           DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+}
